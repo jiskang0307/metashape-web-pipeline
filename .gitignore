@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Metashape
+*.psx
+*.files/
+*.log
+
+# Data
+data/
+uploads/
+outputs/
+pointclouds/
+potree_data/
+
+# Frontend
+node_modules/
+dist/
+
+# OS
+.DS_Store

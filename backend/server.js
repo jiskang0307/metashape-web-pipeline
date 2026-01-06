@@ -4,16 +4,33 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:9000",
+    methods: ["GET", "POST"]
+  }
+});
 
 // CORS 설정
 app.use(cors({
   origin: 'http://localhost:9000',
-  credentials: true
+  credentials: true,
 }));
 
 app.use(express.json());
+
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
 
 // 실행 파일 경로 설정
 const METASHAPE_PATH = 'C:\\Program Files\\Agisoft\\Metashape Pro\\metashape.exe';
@@ -99,7 +116,7 @@ app.post('/api/upload-video', upload.single('video'), (req, res) => {
 
 // Metashape 실행 (기존 코드 유지)
 app.post('/api/process-metashape', async (req, res) => {
-  const { videoFilename, useUploadedFile } = req.body;
+  const { videoFilename, useUploadedFile, socketId } = req.body;
 
   let videoPath;
   let projectPath;
@@ -119,6 +136,7 @@ app.post('/api/process-metashape', async (req, res) => {
   console.log('Starting Metashape process...');
   console.log('Video path:', videoPath);
   console.log('Output path:', outputPath);
+  console.log('Socket ID:', socketId);
 
   if (!fs.existsSync(videoPath)) {
     return res.status(400).json({
@@ -143,7 +161,41 @@ app.post('/api/process-metashape', async (req, res) => {
   metashapeProcess.stdout.on('data', (data) => {
     const message = data.toString();
     outputData += message;
-    console.log(`[Metashape] ${message}`);
+    
+    // 진행률 파싱
+    const lines = message.split('\n');
+    lines.forEach(line => {
+      if (line.startsWith('PROGRESS:')) {
+        // 형식: PROGRESS:70:Building depth maps...
+        const parts = line.split(':');
+        if (parts.length >= 3) {
+          const progress = parseInt(parts[1]);
+          const text = parts.slice(2).join(':').trim();
+          
+          // 진행률이 유효한 범위인지 확인 (0-100)
+          if (progress >= 0 && progress <= 100) {
+            // WebSocket으로 진행률 전송
+            if (socketId) {
+              io.to(socketId).emit('metashape-progress', {
+                progress: progress,
+                message: text
+              });
+            }
+            
+            console.log(`[Progress] ${progress}% - ${text}`);
+          }
+        }
+      } else if (line.trim() && !line.startsWith('PROGRESS:')) {
+        console.log(`[Metashape] ${line}`);
+        
+        // 일반 메시지만 로그로 전송 (PROGRESS 아닌 것만)
+        if (socketId && line.trim()) {
+          io.to(socketId).emit('metashape-log', {
+            message: line.trim()
+          });
+        }
+      }
+    });
   });
 
   metashapeProcess.stderr.on('data', (data) => {
@@ -182,7 +234,6 @@ app.post('/api/process-metashape', async (req, res) => {
     });
   });
 });
-
 // Potree 변환 엔드포인트
 app.post('/api/convert-to-potree', async (req, res) => {
   const { lazFilename } = req.body;
@@ -303,7 +354,7 @@ app.get('/api/download/:filename', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🔧 Using Metashape: ${METASHAPE_PATH}`);

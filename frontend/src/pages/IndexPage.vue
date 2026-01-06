@@ -2,13 +2,12 @@
   <q-page class="flex flex-center">
     <div class="q-pa-md" style="max-width: 800px; width: 100%;">
       <q-card>
-        <!-- 기존 코드 유지 -->
         <q-card-section>
           <div class="text-h6">Metashape Automation</div>
           <div class="text-subtitle2">360° Video to Point Cloud</div>
         </q-card-section>
 
-        <!-- 파일 업로드 섹션 (기존 코드 유지) -->
+        <!-- 기존 업로드 섹션 유지 -->
         <q-card-section>
           <q-tabs
             v-model="inputMode"
@@ -105,22 +104,34 @@
           />
         </q-card-section>
 
-        <!-- 진행 상황 -->
+        <!-- 진행 상황 표시 (개선됨) -->
         <q-card-section v-if="processing">
+          <div class="text-subtitle2 q-mb-md">{{ progressMessage }}</div>
+          
           <q-linear-progress 
-            indeterminate 
+            :value="progressValue / 100"
             color="secondary" 
             class="q-mb-md"
-          />
+            size="20px"
+          >
+            <div class="absolute-full flex flex-center">
+              <q-badge color="white" text-color="primary" :label="`${progressValue}%`" />
+            </div>
+          </q-linear-progress>
+          
           <div class="text-caption text-grey-7">
-            Processing... This may take several minutes.
+            This may take several minutes...
           </div>
         </q-card-section>
 
-        <!-- 로그 -->
+        <!-- 로그 출력 -->
         <q-card-section v-if="logs.length > 0">
           <div class="text-subtitle2 q-mb-sm">Process Logs:</div>
-          <q-scroll-area style="height: 200px; background: #f5f5f5;" class="q-pa-sm rounded-borders">
+          <q-scroll-area 
+            ref="logScroll"
+            style="height: 200px; background: #f5f5f5;" 
+            class="q-pa-sm rounded-borders"
+          >
             <div 
               v-for="(log, index) in logs" 
               :key="index"
@@ -131,7 +142,7 @@
           </q-scroll-area>
         </q-card-section>
 
-        <!-- 결과 -->
+        <!-- 나머지 결과 섹션은 기존과 동일 -->
         <q-card-section v-if="result">
           <q-banner 
             :class="result.success ? 'bg-positive' : 'bg-negative'" 
@@ -171,7 +182,6 @@
           </div>
         </q-card-section>
 
-        <!-- Potree 변환 결과 -->
         <q-card-section v-if="potreeResult">
           <q-separator class="q-mb-md" />
           
@@ -197,7 +207,6 @@
               Location: {{ potreeResult.outputDir }}
             </div>
             
-            <!-- View 버튼 추가 -->
             <q-btn
               color="positive"
               label="View Point Cloud"
@@ -214,21 +223,29 @@
 </template>
 
 <script>
-import { ref } from 'vue';
+import { ref, nextTick } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router';
+import { io } from 'socket.io-client';
 
 export default {
   name: 'IndexPage',
   
   setup() {
+    const router = useRouter();
+    
     const processing = ref(false);
     const uploading = ref(false);
     const convertingPotree = ref(false);
     const result = ref(null);
     const potreeResult = ref(null);
     const logs = ref([]);
-    const router = useRouter();
+    const logScroll = ref(null);
+    
+    const progressValue = ref(0);
+    const progressMessage = ref('Starting...');
+    const lastProgress = ref(-1); // 마지막 진행률 저장
+    
     const inputMode = ref('upload');
     
     const videoFile = ref(null);
@@ -239,6 +256,8 @@ export default {
     const outputPath = ref('D:/metashape_automation/output.laz');
 
     const API_BASE = 'http://localhost:3000/api';
+    
+    let socket = null;
 
     const onFileSelected = (file) => {
       if (file) {
@@ -254,6 +273,14 @@ export default {
       const sizes = ['Bytes', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const scrollToBottom = async () => {
+      await nextTick();
+      if (logScroll.value) {
+        const scrollArea = logScroll.value;
+        scrollArea.setScrollPosition('vertical', scrollArea.getScrollTarget().scrollHeight);
+      }
     };
 
     const uploadVideo = async () => {
@@ -279,6 +306,7 @@ export default {
 
         uploadedFile.value = response.data.file;
         logs.value.push('✓ Upload complete!');
+        scrollToBottom();
 
       } catch (error) {
         console.error('Upload error:', error);
@@ -297,49 +325,86 @@ export default {
       result.value = null;
       potreeResult.value = null;
       logs.value = [];
+      progressValue.value = 0;
+      progressMessage.value = 'Starting...';
+      lastProgress.value = -1; // 초기화
 
-      try {
-        logs.value.push('Starting Metashape process...');
+      // WebSocket 연결
+      socket = io('http://localhost:3000');
+      
+      socket.on('connect', async () => {
+        console.log('Socket connected:', socket.id);
         
-        const requestData = inputMode.value === 'upload'
-          ? {
-              useUploadedFile: true,
-              videoFilename: uploadedFile.value.filename
-            }
-          : {
-              useUploadedFile: false,
-              videoPath: videoPath.value,
-              projectPath: projectPath.value,
-              outputPath: outputPath.value
-            };
+        try {
+          logs.value.push('Starting Metashape process...');
+          scrollToBottom();
+          
+          const requestData = inputMode.value === 'upload'
+            ? {
+                useUploadedFile: true,
+                videoFilename: uploadedFile.value.filename,
+                socketId: socket.id
+              }
+            : {
+                useUploadedFile: false,
+                videoPath: videoPath.value,
+                projectPath: projectPath.value,
+                outputPath: outputPath.value,
+                socketId: socket.id
+              };
 
-        const response = await axios.post(`${API_BASE}/process-metashape`, requestData, {
-          timeout: 600000
-        });
+          const response = await axios.post(`${API_BASE}/process-metashape`, requestData, {
+            timeout: 600000
+          });
 
-        logs.value.push('✓ Process completed!');
-        
-        result.value = {
-          success: true,
-          message: response.data.message,
-          outputPath: response.data.outputPath,
-          outputFilename: response.data.outputFilename
-        };
+          logs.value.push('✓ Process completed!');
+          scrollToBottom();
+          
+          result.value = {
+            success: true,
+            message: response.data.message,
+            outputPath: response.data.outputPath,
+            outputFilename: response.data.outputFilename
+          };
 
-      } catch (error) {
-        console.error('Error:', error);
-        
-        const errorMessage = error.response?.data?.error || error.message;
-        logs.value.push(`✗ Error: ${errorMessage}`);
-        
-        result.value = {
-          success: false,
-          message: 'Process failed: ' + errorMessage
-        };
-        
-      } finally {
-        processing.value = false;
-      }
+        } catch (error) {
+          console.error('Error:', error);
+          
+          const errorMessage = error.response?.data?.error || error.message;
+          logs.value.push(`✗ Error: ${errorMessage}`);
+          scrollToBottom();
+          
+          result.value = {
+            success: false,
+            message: 'Process failed: ' + errorMessage
+          };
+          
+        } finally {
+          processing.value = false;
+          if (socket) {
+            socket.disconnect();
+          }
+        }
+      });
+      
+      // 진행률 업데이트 수신 (중복 방지)
+      socket.on('metashape-progress', (data) => {
+        // 진행률이 증가할 때만 업데이트 (역행 방지)
+        if (data.progress >= lastProgress.value) {
+          progressValue.value = data.progress;
+          progressMessage.value = data.message;
+          lastProgress.value = data.progress;
+          console.log(`Progress: ${data.progress}% - ${data.message}`);
+        }
+      });
+      
+      // 로그 메시지 수신
+      socket.on('metashape-log', (data) => {
+        if (data.message && !data.message.startsWith('PROGRESS:')) {
+          logs.value.push(data.message);
+          scrollToBottom();
+        }
+      });
     };
 
     const convertToPotree = async (lazFilename) => {
@@ -348,14 +413,16 @@ export default {
 
       try {
         logs.value.push('Starting Potree conversion...');
+        scrollToBottom();
 
         const response = await axios.post(`${API_BASE}/convert-to-potree`, {
           lazFilename: lazFilename
         }, {
-          timeout: 300000 // 5분
+          timeout: 300000
         });
 
         logs.value.push('✓ Potree conversion complete!');
+        scrollToBottom();
 
         potreeResult.value = {
           success: true,
@@ -370,6 +437,7 @@ export default {
         
         const errorMessage = error.response?.data?.error || error.message;
         logs.value.push(`✗ Potree conversion failed: ${errorMessage}`);
+        scrollToBottom();
         
         potreeResult.value = {
           success: false,
@@ -388,7 +456,10 @@ export default {
       if (potreeResult.value && potreeResult.value.potreeFolder) {
         router.push({
           name: 'potree-viewer',
-          params: { folder: potreeResult.value.potreeFolder }
+          params: { 
+            folder: potreeResult.value.potreeFolder,
+            htmlFile: 'none.html'
+          }
         });
       }
     };
@@ -400,6 +471,9 @@ export default {
       result,
       potreeResult,
       logs,
+      logScroll,
+      progressValue,
+      progressMessage,
       inputMode,
       videoFile,
       uploadedFile,

@@ -6,21 +6,39 @@ const multer = require('multer');
 const fs = require('fs');
 const http = require('http');
 const { Server } = require('socket.io');
+const os = require('os');
 
 const app = express();
 const server = http.createServer(app);
+
+const ALLOWED_ORIGINS = [
+  'http://localhost:9000',
+  'http://172.17.4.101',
+];
+
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:9000",
-    methods: ["GET", "POST"]
+    origin: ALLOWED_ORIGINS,
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
 // CORS 설정
 app.use(cors({
-  origin: 'http://localhost:9000',
+  origin: function (origin, callback) {
+    // origin이 없거나 (같은 서버) 허용 목록에 있으면 OK
+    if (!origin || ALLOWED_ORIGINS.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
+
+const isWindows = os.platform() === 'win32';
+const isLinux = os.platform() === 'linux';
 
 app.use(express.json());
 
@@ -33,8 +51,14 @@ io.on('connection', (socket) => {
 });
 
 // 실행 파일 경로 설정
-const METASHAPE_PATH = 'C:\\Program Files\\Agisoft\\Metashape Pro\\metashape.exe';
-const POTREE_CONVERTER_PATH = path.join(__dirname, 'PotreeConverter.exe');
+const METASHAPE_PATH = isLinux 
+  ? '/home/tako/Downloads/metashape-pro/metashape.sh'
+  : 'C:\\Program Files\\Agisoft\\Metashape Pro\\metashape.exe';
+
+const POTREE_CONVERTER_PATH = path.join(
+  __dirname, 
+  isLinux ? 'PotreeConverter' : 'PotreeConverter.exe'
+);
 
 // 폴더 설정
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
@@ -79,8 +103,23 @@ const upload = multer({
 
 // 상태 확인
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'Server is running' });
+  const health = {
+    status: 'Server is running',
+    platform: os.platform(),
+    checks: {
+      metashapeExists: fs.existsSync(METASHAPE_PATH),
+      metashapeExecutable: isLinux ? fs.accessSync(METASHAPE_PATH, fs.constants.X_OK) === undefined : true,
+      potreeExists: fs.existsSync(POTREE_CONVERTER_PATH),
+      potreeExecutable: isLinux ? fs.accessSync(POTREE_CONVERTER_PATH, fs.constants.X_OK) === undefined : true,
+      uploadsDir: fs.existsSync(UPLOAD_DIR),
+      outputsDir: fs.existsSync(OUTPUT_DIR),
+      potreeDir: fs.existsSync(POTREE_DIR)
+    }
+  };
+  
+  res.json(health);
 });
+
 
 // 파일 업로드
 app.post('/api/upload-video', upload.single('video'), (req, res) => {
@@ -128,9 +167,10 @@ app.post('/api/process-metashape', async (req, res) => {
     projectPath = path.join(OUTPUT_DIR, `project_${timestamp}.psx`);
     outputPath = path.join(OUTPUT_DIR, `output_${timestamp}.laz`);
   } else {
-    videoPath = req.body.videoPath || 'D:/metashape_automation/10stest.mp4';
-    projectPath = req.body.projectPath || 'D:/metashape_automation/project.psx';
-    outputPath = req.body.outputPath || 'D:/metashape_automation/output.laz';
+    videoPath = req.body.videoPath || path.join(UPLOAD_DIR, 'test_video.mp4');
+    const timestamp = Date.now();
+    projectPath = req.body.projectPath || path.join(OUTPUT_DIR, `project_${timestamp}.psx`);
+    outputPath = req.body.outputPath || path.join(OUTPUT_DIR, `output_${timestamp}.laz`);
   }
 
   console.log('Starting Metashape process...');

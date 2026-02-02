@@ -255,7 +255,7 @@ export default {
     const projectPath = ref('D:/metashape_automation/project.psx');
     const outputPath = ref('D:/metashape_automation/output.laz');
 
-    const API_BASE = 'http://localhost:3000/api';
+    const API_BASE = 'http://localhost:3001/api';
     
     let socket = null;
 
@@ -330,7 +330,7 @@ export default {
       lastProgress.value = -1; // 초기화
 
       // WebSocket 연결
-      socket = io('http://localhost:3000');
+      socket = io('http://localhost:3001');
       
       socket.on('connect', async () => {
         console.log('Socket connected:', socket.id);

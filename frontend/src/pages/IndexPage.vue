@@ -353,9 +353,7 @@ export default {
                 socketId: socket.id
               };
 
-          const response = await axios.post(`${API_BASE}/process-metashape`, requestData, {
-            timeout: 600000
-          });
+          const response = await axios.post(`${API_BASE}/process-metashape`, requestData);
 
           logs.value.push('✓ Process completed!');
           scrollToBottom();

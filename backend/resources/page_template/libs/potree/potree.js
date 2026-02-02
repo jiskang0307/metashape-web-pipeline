@@ -65161,18 +65161,19 @@ void main() {
 			}
 
 			Potree.loadPointCloud(data.url, data.name, (e) => {
-				const {pointcloud} = e;
+				const { pointcloud } = e;
 
 				pointcloud.position.set(...data.position);
 				pointcloud.rotation.set(...data.rotation);
 				pointcloud.scale.set(...data.scale);
 
 				loadMaterial(pointcloud.material);
-
 				viewer.scene.addPointCloud(pointcloud);
 
 				resolve(pointcloud);
 			});
+
+
 		});
 
 		return promise;

@@ -56,7 +56,7 @@ try:
         path=video_path,
         image_path="D:/metashape_automation/frames/frame_{filenum}.jpg",
         frame_step=Metashape.FrameStep.CustomFrameStep,
-        custom_frame_step=10,
+        custom_frame_step=1,
         time_start=0,
         time_end=-1
     )

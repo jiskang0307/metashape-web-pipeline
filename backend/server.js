@@ -197,6 +197,7 @@ app.post('/api/process-metashape', async (req, res) => {
 
   let outputData = '';
   let errorData = '';
+  let responseAlreadySent = false;
 
   metashapeProcess.stdout.on('data', (data) => {
     const message = data.toString();
@@ -245,9 +246,14 @@ app.post('/api/process-metashape', async (req, res) => {
   });
 
   metashapeProcess.on('close', (code) => {
+    if (responseAlreadySent) return;
     console.log(`Metashape process exited with code ${code}`);
-    
-    if (code === 0) {
+    console.log('Output data:', outputData);
+    console.log('Error data:', errorData);
+    console.log('Output file exists:', fs.existsSync(outputPath));
+    const lazExists = fs.existsSync(outputPath);
+
+    if (code === 0 && lazExists ) {
       res.json({
         success: true,
         message: 'LAZ Export Complete',
@@ -266,6 +272,7 @@ app.post('/api/process-metashape', async (req, res) => {
   });
 
   metashapeProcess.on('error', (error) => {
+    if (responseAlreadySent) return;
     console.error('Failed to start Metashape process:', error);
     res.status(500).json({
       success: false,

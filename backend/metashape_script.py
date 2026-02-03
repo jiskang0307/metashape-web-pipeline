@@ -13,6 +13,7 @@ step_weights = {
     6: (95, 100)     # Export LAZ: 95-100%
 }
 
+
 def print_progress(message, progress=None):
     """진행 상황을 출력"""
     if progress is not None:
@@ -37,12 +38,22 @@ def make_callback(step_num):
     return callback
 
 try:
-    video_path = sys.argv[1] if len(sys.argv) > 1 else "D:/metashape_automation/10stest.mp4"
-    project_path = sys.argv[2] if len(sys.argv) > 2 else "D:/metashape_automation/project.psx"
-    export_laz_path = sys.argv[3] if len(sys.argv) > 3 else "D:/metashape_automation/output.laz"
+    video_path = sys.argv[1] if len(sys.argv) > 1 else "test_video.mp4"
+    project_path = sys.argv[2] if len(sys.argv) > 2 else "project.psx"
+    export_laz_path = sys.argv[3] if len(sys.argv) > 3 else "output.laz"
+
+    video_dir = os.path.dirname(video_path)
+    frames_dir = os.path.join(video_dir, "frames")
+
+    os.makedirs(frames_dir, exist_ok=True)
+
+    frame_path = os.path.join(frames_dir, "frame_{filenum}.jpg")
 
     print_progress(f"Starting process with video: {video_path}", 0)
     
+    if not os.path.exists(video_path):
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+
     # 프로젝트 생성
     doc = Metashape.Document()
     doc.save(project_path)
@@ -54,7 +65,7 @@ try:
     
     chunk.importVideo(
         path=video_path,
-        image_path="D:/metashape_automation/frames/frame_{filenum}.jpg",
+        image_path=frame_path,
         frame_step=Metashape.FrameStep.CustomFrameStep,
         custom_frame_step=1,
         time_start=0,

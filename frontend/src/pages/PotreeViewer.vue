@@ -40,7 +40,7 @@ export default {
     
     const potreeUrl = computed(() => {
       const folder = route.params.folder;
-      return `http://localhost:3001/potree-data/${folder}/none.html`;
+      return `http://172.17.4.101:3001/potree-data/${folder}/none.html`;
     });
     
     const onIframeLoad = () => {

@@ -253,6 +253,18 @@ app.post('/api/process-metashape', async (req, res) => {
     console.log('Output file exists:', fs.existsSync(outputPath));
     const lazExists = fs.existsSync(outputPath);
 
+    if (fs.existsSync(outputPath)) {
+      responseAlreadySent = true;
+      return res.json({
+        success: true,
+        message: 'LAZ Export Complete',
+        outputPath: outputPath,
+        outputFilename: path.basename(outputPath),
+        exitCode: code,
+        warning: code !== 0 ? 'Process completed with warnings (ICE error)' : null
+      });
+    }
+
     if (code === 0 && lazExists ) {
       res.json({
         success: true,

@@ -60,7 +60,7 @@ try:
     chunk = doc.addChunk()
 
     # ===== STEP 1: Video → Frames 추출 (0-20%) =====
-    current_step = 1
+    current_step = 10
     print_progress("Step 1/6: Importing video and extracting frames...", 0)
     
     chunk.importVideo(

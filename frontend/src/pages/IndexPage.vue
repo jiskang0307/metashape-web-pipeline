@@ -456,7 +456,7 @@ export default {
           name: 'potree-viewer',
           params: { 
             folder: potreeResult.value.potreeFolder,
-            htmlFile: 'none.html'
+            htmlFile: 'index.html'
           }
         });
       }

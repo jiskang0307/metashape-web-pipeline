@@ -328,7 +328,7 @@ app.post('/api/convert-to-potree', async (req, res) => {
   const args = [
     lazPath,
     '-o', potreeOutputDir,
-    '--generate-page', 'none'
+    '--generate-page', 'index'
   ];
 
   console.log('Running command:', POTREE_CONVERTER_PATH, args.join(' '));

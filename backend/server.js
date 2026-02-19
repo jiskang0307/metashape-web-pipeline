@@ -327,8 +327,7 @@ app.post('/api/convert-to-potree', async (req, res) => {
 
   const args = [
     lazPath,
-    '-o', potreeOutputDir,
-    '--generate-page', 'index'
+    '-o', potreeOutputDir
   ];
 
   console.log('Running command:', POTREE_CONVERTER_PATH, args.join(' '));
@@ -382,7 +381,9 @@ app.post('/api/convert-to-potree', async (req, res) => {
         output: outputData,
         outputDir: potreeOutputDir,
         files: files,
-        potreeFolder: path.basename(potreeOutputDir)
+        potreeFolder: path.basename(potreeOutputDir),
+        hasMetadata: hasMetadata,
+        metadataPath: hasMetadata ? `potree-data/${path.basename(potreeOutputDir)}/pointclouds/index/metadata.json` : null
       });
     } else {
       res.status(500).json({

@@ -73,7 +73,7 @@ const POTREE_DIR = path.join(__dirname, 'potree_data');
 });
 
 // Potree 데이터 폴더를 static으로 서빙
-app.use('/potree-data', express.static(POTREE_DIR));
+app.use('/potree_data', express.static(POTREE_DIR));
 
 // Multer 설정 (기존 코드 유지)
 const storage = multer.diskStorage({

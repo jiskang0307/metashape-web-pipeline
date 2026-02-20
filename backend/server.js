@@ -371,8 +371,17 @@ app.post('/api/convert-to-potree', async (req, res) => {
     
     if (code === 0) {
       let files = [];
+
+      const metadataPath = path.join(potreeOutputDir, 'metadata.json');
+      const hasMetadata = fs.existsSync(metadataPath);
+      
+      console.log('Metadata path:', metadataPath);
+      console.log('Metadata exists:', hasMetadata);
+    
+
       if (fs.existsSync(potreeOutputDir)) {
         files = fs.readdirSync(potreeOutputDir);
+        console.log('Files in output dir:', files);
       }
       
       res.json({
@@ -383,7 +392,7 @@ app.post('/api/convert-to-potree', async (req, res) => {
         files: files,
         potreeFolder: path.basename(potreeOutputDir),
         hasMetadata: hasMetadata,
-        metadataPath: hasMetadata ? `potree-data/${path.basename(potreeOutputDir)}/pointclouds/index/metadata.json` : null
+        metadataPath: hasMetadata ? `potree-data/${path.basename(potreeOutputDir)}/metadata.json` : null
       });
     } else {
       res.status(500).json({

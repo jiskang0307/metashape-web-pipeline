@@ -392,7 +392,7 @@ app.post('/api/convert-to-potree', async (req, res) => {
         files: files,
         potreeFolder: path.basename(potreeOutputDir),
         hasMetadata: hasMetadata,
-        metadataPath: hasMetadata ? `potree-data/${path.basename(potreeOutputDir)}/metadata.json` : null
+        metadataPath: hasMetadata ? `potree_data/${path.basename(potreeOutputDir)}/metadata.json` : null
       });
     } else {
       res.status(500).json({
@@ -431,5 +431,5 @@ server.listen(PORT, () => {
   console.log(`📁 Upload directory: ${UPLOAD_DIR}`);
   console.log(`📁 Output directory: ${OUTPUT_DIR}`);
   console.log(`📁 Potree directory: ${POTREE_DIR}`);
-  console.log(`🌐 Potree data accessible at: http://localhost:${PORT}/potree-data`);
+  console.log(`🌐 Potree data accessible at: http://localhost:${PORT}/potree_data`);
 });

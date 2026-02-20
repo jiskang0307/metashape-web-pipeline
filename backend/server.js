@@ -73,7 +73,31 @@ const POTREE_DIR = path.join(__dirname, 'potree_data');
 });
 
 // Potree 데이터 폴더를 static으로 서빙
-app.use('/potree_data', express.static(POTREE_DIR));
+
+app.use('/potree_data', (req, res, next) => {
+  // CORS 헤더 설정
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  
+  console.log('==========================================');
+  console.log('📂 Potree data request:', req.url);
+  console.log('📁 POTREE_DIR:', POTREE_DIR);
+  
+  // 요청된 파일의 절대 경로 확인
+  const requestedPath = path.join(POTREE_DIR, req.path);
+  console.log('📄 Requested file:', requestedPath);
+  console.log('✓ File exists:', fs.existsSync(requestedPath));
+  console.log('==========================================');
+  
+  next();
+}, express.static(POTREE_DIR, {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.json')) {
+      res.setHeader('Content-Type', 'application/json');
+    }
+  }
+}));
 
 // Multer 설정 (기존 코드 유지)
 const storage = multer.diskStorage({
@@ -120,6 +144,25 @@ app.get('/api/health', (req, res) => {
   res.json(health);
 });
 
+app.get('/api/check-potree/:folder', (req, res) => {
+  const folder = req.params.folder;
+  const folderPath = path.join(POTREE_DIR, folder);
+  const metadataPath = path.join(folderPath, 'metadata.json');
+  
+  const result = {
+    folder: folder,
+    folderPath: folderPath,
+    folderExists: fs.existsSync(folderPath),
+    metadataExists: fs.existsSync(metadataPath),
+    potreeDir: POTREE_DIR
+  };
+  
+  if (fs.existsSync(folderPath)) {
+    result.files = fs.readdirSync(folderPath);
+  }
+  
+  res.json(result);
+});
 
 // 파일 업로드
 app.post('/api/upload-video', upload.single('video'), (req, res) => {
